@@ -1,3 +1,11 @@
 server/server
+server/example-notes.cpp
+server/example.cpp
+server/example-s
+
 client/client
-todo
+client/example-notes.cpp
+client/example.cpp
+client/example-cl
+
+
