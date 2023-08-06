@@ -50,6 +50,7 @@ int read_digits_line(int connection_sock, char* buffer, size_t buffer_size) {
 }
 
 int read_data(int connection_sock) {   
+    const unsigned length_min = 3;
     const unsigned n_digits = 5;
     const size_t buffer_size = n_digits + 1;
     char buffer[buffer_size] = {0};  
@@ -61,7 +62,16 @@ int read_data(int connection_sock) {
             perror("from_char: wrong number");
             return -1;
         }
-        printf("  received: %u\n", value);
+
+        if(line_length < length_min) {
+            printf("    error: expected length > %u, but received %u\n", length_min - 1, static_cast<unsigned>(line_length));
+        }
+        else if(!is_multiple_of_32(value)) {         
+            printf("    error: value %u is not multiple of 32\n", value);
+        }
+        else {
+            printf("    received: value is %u\n", value);
+        }
     }
     return line_length;
 }
