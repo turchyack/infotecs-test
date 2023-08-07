@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <charconv>
+#include <cstring>
 
 static uint16_t PORT = 10001; 
 
@@ -30,32 +31,39 @@ bool is_multiple_of_32(unsigned value) {
 // > 0 - ошибок нет, длина строки в буфере 
 // 0 - конец файла
 //
-int read_digits_line(int connection_sock, char* buffer, size_t buffer_size) { 
-    for(size_t offset = 0; offset < buffer_size; offset++) {
-        ssize_t n_bytes = read(connection_sock, buffer + offset, 1);
-        if(n_bytes < 1) {
-            if(n_bytes == -1) {
-                perror("read failed");  
-                return -1;  // ошибка ввода/вывода
-            }
-            return 0;  // конец файла
-        }
-        if(!std::isdigit(static_cast<int>(buffer[offset]))) {
-            if(buffer[offset] == '\n') {
-                if(offset == 0) {
-                    errno = EINVAL;
-                    perror("empty string");  // пустую строку считаем ошибкой 
-                    return -1;  
-                }
-                return offset;  // прочитана строка цифр
-            }
-            perror("not digit");
-            return -1;  // прочитана не цифра
-        } 
+int read_digits_line_remainder(int connection_sock, char* buffer, size_t buffer_size) {
+    size_t offset = 0;
+    ssize_t n_bytes = 0;
+    if(buffer_size < 1) {
+        errno = EINVAL;
+        perror("buffer too small");
+        return -1;
     }
-    errno = EMSGSIZE;
-    perror("string too long");
-    return -1;
+    bool was_digits = true;
+    while((n_bytes = read(connection_sock, buffer + offset, 1)) != 0) {
+        if(n_bytes == -1) {
+            perror("read failed");
+            return -1; // ошибка ввода/вывода
+        }
+        if(buffer[offset] == '\n') {
+            if(was_digits) {
+                return offset;  
+            }
+            return -2;   // ошибка данных - прочитана не цифра
+        }
+        if(was_digits) {
+            if(!std::isdigit(static_cast<int>(buffer[offset]))) {
+                was_digits = false;
+            }
+        }
+        if(offset >= buffer_size - 1) {
+            std::memmove(&buffer[0], &buffer[1], buffer_size - 1);
+        }
+        else {
+            offset++;
+        }
+    }
+    return 0;
 }
 
 // функция вычитывет строки из соединения
@@ -71,11 +79,18 @@ int read_data(int connection_sock) {
     char buffer[buffer_size] = {0};  
     ssize_t line_length{};
     unsigned value{};
-    while((line_length = read_digits_line(connection_sock, buffer, buffer_size)) > 0) {
+    while((line_length = read_digits_line_remainder(connection_sock, buffer, buffer_size)) != 0) {
+        if(line_length < 0) {
+            if(line_length == -2) {
+                printf("    error: received wrong number\n");
+                continue;
+            }
+            return -1;
+        }
         auto r = std::from_chars(buffer, buffer + line_length, value);
         if(r.ec != std::errc()) {
-            perror("from_char: wrong number");
-            return -1;
+            printf("    error: received wrong number\n");
+            continue;
         }
 
         if(line_length < length_min) {
@@ -85,12 +100,8 @@ int read_data(int connection_sock) {
             printf("    error: value %u is not multiple of 32\n", value);
         }
         else {
-            printf("    received: value is %u\n", value);
+            printf("    received number of multiple of 32\n");
         }
-    }
-    if(line_length != 0) {
-        perror("read_digits_line");
-        return -1;
     }
     return 0;
 }
