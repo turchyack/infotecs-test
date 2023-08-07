@@ -8,19 +8,28 @@
 #include <charconv>
 
 static uint16_t PORT = 10001; 
-// 32 = 2^5
 
+// функция 
+// проверяет делимость на 32 передаваемого ей числа  
+// return:
+// true - если число делится на 32
+// false - если число не делится на 32
+//
 bool is_multiple_of_32(unsigned value) {
     const unsigned power10_5 = 100000;
     const unsigned power2_5 = 32;
     unsigned remainder = value % power10_5;
     return remainder % power2_5 == 0;
 }
+
+// функция
+// читает строку из соединения. Каждый символ строки должен быть цифрой(0-9),
+// если это не так - возвращается ошибка. 
 // return: 
 // -1 - ошибка 
-// > 0 - ошибок нет, длина строки в буфере -
+// > 0 - ошибок нет, длина строки в буфере 
 // 0 - конец файла
-
+//
 int read_digits_line(int connection_sock, char* buffer, size_t buffer_size) { 
     for(size_t offset = 0; offset < buffer_size; offset++) {
         ssize_t n_bytes = read(connection_sock, buffer + offset, 1);
@@ -49,6 +58,12 @@ int read_digits_line(int connection_sock, char* buffer, size_t buffer_size) {
     return -1;
 }
 
+// функция вычитывет строки из соединения
+// проверяет делимость на 32
+// return: 
+// 0 - ошибок нет, достигнут
+// -1
+// 
 int read_data(int connection_sock) {   
     const unsigned length_min = 3;
     const unsigned n_digits = 5;
@@ -73,7 +88,11 @@ int read_data(int connection_sock) {
             printf("    received: value is %u\n", value);
         }
     }
-    return line_length;
+    if(line_length != 0) {
+        perror("read_digits_line");
+        return -1;
+    }
+    return 0;
 }
 
 int main() {

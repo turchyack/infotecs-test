@@ -11,7 +11,7 @@ test2: server: read data
     а) "576" - окей "кратно 32 и длина больше 2х символов" 
     received: 576
     б) "64" - ошибка "меньше 2х символов"                    
-    error: length < 2 
+    error: length < 3 
     в) "127" - ошибка "не кратно 32" 
     error: is not multiple of 32
 
