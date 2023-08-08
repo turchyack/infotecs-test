@@ -57,7 +57,7 @@ int read_digits_line_remainder(int connection_sock, char* buffer, size_t buffer_
             }
         }
         if(offset >= buffer_size - 1) {
-            std::memmove(&buffer[0], &buffer[1], buffer_size - 1);
+            std::memmove(&buffer[0], &buffer[1], sizeof(buffer[0]) * (buffer_size - 1));
         }
         else {
             offset++;
