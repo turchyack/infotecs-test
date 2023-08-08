@@ -52,7 +52,7 @@ int read_digits_line_remainder(int connection_sock, char* buffer, size_t buffer_
             return -2;   // ошибка данных - прочитана не цифра
         }
         if(was_digits) {
-            if(!std::isdigit(static_cast<int>(buffer[offset]))) {
+            if(!std::isdigit(buffer[offset])) {
                 was_digits = false;
             }
         }
@@ -107,7 +107,6 @@ int read_data(int connection_sock) {
 }
 
 int main() {
-    const size_t buffer_size = 1024;
     
     int server_sock = socket(AF_INET, SOCK_STREAM, 0);
     if(server_sock == -1) {

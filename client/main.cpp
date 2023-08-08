@@ -1,58 +1,76 @@
-
+#include <errno.h>
 #include <cstdio>
 #include <cstring>
-
+#include <cctype>
 
 // return
-// 0 - ошибок нет
 // -1 - ошибка ввода/вывода
-// -2 - EOF
-int skip_line(FILE* stream) {
-    int c = 0;
-    while((c = getc(stream)) != EOF) {
-        if(static_cast<char>(c)=='\n') {
-            return 0;
-        }
-    }
-    if(ferror(stream)!=0) {
-        return -1;
-    }
-    return -2;
-}
-
-
-
-int main() {
-
-    const size_t input_chars_max  = 4;
-    const size_t buffer_size = input_chars_max +2; // +2 - \n\0
-    char buffer[buffer_size];
-
+// -2 - ошибка - введена пустая строка
+// -3 - ошибка - строка слишком длинная
+// -4 - ошибка - не цифра
+// 0 - конец потока
+// >0 - принята строка цифр, значение представляет длину строки
+// 
+ssize_t input_digits_line(FILE* stream, char* buffer, size_t buffer_size) {
     printf("введите строку: ");
     fflush(stdout);
-// 1) короткая строка будет \n, \0
-// 2) влезла в буфер не будет \n будет \0  fgets вернёт хвост
-// 3) не влезла в буфер  будет \0 не будет \n    fgets вернёт хвост
-
-
-    while(fgets(buffer, buffer_size, stdin) !=0) {
-        size_t line_length = strlen(buffer);
-        if(buffer[line_length -1] == '\n') { // случай №1
-            buffer[line_length -1] = '\0';
-            printf("buffer - '%.*s'\n", static_cast<int>(buffer_size), buffer);
-            // TODO: process data 
-        }
-        else {  // случай 2-3
-            
-            if(skip_line(stdin)==-1) {
-                perror("skip_line");
-                return -1;
+    int c = 0;
+    size_t line_length = 0;
+    bool was_digits = true;
+    while((c = getc(stream)) != EOF) {
+        if(c == '\n') {
+            if(line_length == 0) {
+                return -2;
             }
-            printf("ошибка: превышено количество символов(>%u)\n", static_cast<unsigned>(input_chars_max));
-
+            if(!was_digits) {
+                return -4;
+            }
+            if(line_length > buffer_size) {
+                return -3;
+            }
+            
+            return line_length;
         }
-        printf("введите строку: ");
-        fflush(stdout);
+        if(was_digits) {
+            if(std::isdigit(c)) {
+                if(line_length < buffer_size) {
+                    buffer[line_length] = c;
+                }
+            }
+            else {
+                was_digits = false;
+            }
+        }
+        line_length++;
+    }
+    if(ferror(stream)) {
+        return -1;  // ошибка ввода/вывода
+    }
+    return 0;   // конец потока  
+}
+
+int main() {
+    const size_t buffer_size = 64; 
+    char buffer[buffer_size] = {};
+    ssize_t line_length = 0;
+    while((line_length = input_digits_line(stdin, buffer, buffer_size)) != 0) {
+        if(line_length < 0) {
+            switch(line_length) {
+            case -1: 
+                fprintf(stderr, "error: IO error - %s\n", strerror(errno));
+                return -1;
+            case -2:
+                fprintf(stderr, "error: input empty string\n");
+                continue;
+            case -3:
+                fprintf(stderr, "error: too long string\n");
+                continue;
+            default:
+                fprintf(stderr, "error: wrong number\n");
+                continue;       
+            }
+        }
+        printf("принята строка[%u]: '%.*s'\n", static_cast<unsigned>(line_length), static_cast<unsigned>(line_length), buffer);
     }
     return 0;
 }
