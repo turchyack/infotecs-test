@@ -3,6 +3,9 @@
 #include <cstring>
 #include <cctype>
 #include <algorithm>
+#include <thread>
+#include <unistd.h>
+
 
 // return
 // -1 - ошибка ввода/вывода
@@ -51,6 +54,10 @@ ssize_t input_digits_line(FILE* stream, char* buffer, size_t buffer_size) {
     return 0;   // конец потока
 }
 
+// return
+// > 0 - длина результирующей строки('\0' не добавляется)
+// -1 ошибка - недостаточно места в буфере
+//
 ssize_t subtitude_even_digits(char* result_buffer,  size_t result_buffer_size, size_t line_length) {
     const char subst_fragment[] = "KB";
     size_t fragment_size = sizeof(subst_fragment) -1;
@@ -94,14 +101,58 @@ void transfer_line_to_sender(char* result_buffer, size_t result_buffer_size) {
 
 }
 
+class Sender {
+public:
+    Sender();
+    void stop();
+    ~Sender();
+
+private:
+    bool sender_work;
+    std::thread thread;
+    static void main_wrapper(Sender* self) {
+        self->main();
+    }
+    void main();
+};
+
+Sender::Sender() :  sender_work(true), thread(main_wrapper, this) {
+}
+
+Sender::~Sender() {
+    if(sender_work) {
+        stop();
+    }
+}
+
+void Sender::main() {
+    fprintf(stderr,"нить запущена\n");
+    unsigned x = 0;
+    while(sender_work) {
+        fprintf(stderr, "sleep%u\n",x);
+        sleep(3);
+        x++;
+    }
+    fprintf(stderr,"конец нити\n");
+}
+
+void Sender::stop() {
+    fprintf(stderr,"stop\n");
+    sender_work = false;
+    thread.join();
+}
+
 int main() {
+    Sender sender;
+
+    // обработка данных потоком №1
     const size_t buffer_size = 64;
     char buffer[buffer_size] = {};
     const size_t result_buffer_size = buffer_size * 2;
     char result_buffer[result_buffer_size] = {};
     ssize_t line_length = 0;
-
-    while((line_length = input_digits_line(stdin, buffer, buffer_size)) != 0) {
+    bool stop_flag = false;
+    while(!stop_flag && (line_length = input_digits_line(stdin, buffer, buffer_size)) != 0) {
         if(line_length < 0) {
             switch(line_length) {
             case -1:
@@ -109,6 +160,7 @@ int main() {
                 return -1;
             case -2:
                 fprintf(stderr, "error: input empty string\n");
+                stop_flag = true;
                 continue;
             case -3:
                 fprintf(stderr, "error: too long string\n");
@@ -117,13 +169,19 @@ int main() {
                 fprintf(stderr, "error: wrong number\n");
                 continue;
             }
+
         }
         printf("Debug: принята строка[%u]: '%.*s'\n", static_cast<unsigned>(line_length), static_cast<unsigned>(line_length), buffer);
         ssize_t transformed_length = transform_line(buffer,  line_length, result_buffer, result_buffer_size);
         if(transformed_length == -1) {
             return -1;
         }
+
         transfer_line_to_sender(result_buffer, transformed_length);
+
     }
+    fprintf(stderr, "debug: wait for join\n");
+    sender.stop();
+    fprintf(stderr, "debug: joined\n");
     return 0;
 }
