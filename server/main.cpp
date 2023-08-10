@@ -8,10 +8,10 @@
 #include <charconv>
 #include <cstring>
 
-static uint16_t PORT = 10001; 
+static uint16_t PORT = 10001;
 
-// функция 
-// проверяет делимость на 32 передаваемого ей числа  
+// функция
+// проверяет делимость на 32 передаваемого ей числа
 // return:
 // true - если число делится на 32
 // false - если число не делится на 32
@@ -25,10 +25,10 @@ bool is_multiple_of_32(unsigned value) {
 
 // функция
 // читает строку из соединения. Каждый символ строки должен быть цифрой(0-9),
-// если это не так - возвращается ошибка. 
-// return: 
-// -1 - ошибка 
-// > 0 - ошибок нет, длина строки в буфере 
+// если это не так - возвращается ошибка.
+// return:
+// -1 - ошибка
+// > 0 - ошибок нет, длина строки в буфере
 // 0 - конец файла
 //
 int read_digits_line_remainder(int connection_sock, char* buffer, size_t buffer_size) {
@@ -47,7 +47,7 @@ int read_digits_line_remainder(int connection_sock, char* buffer, size_t buffer_
         }
         if(buffer[offset] == '\n') {
             if(was_digits) {
-                return offset;  
+                return offset;
             }
             return -2;   // ошибка данных - прочитана не цифра
         }
@@ -68,15 +68,15 @@ int read_digits_line_remainder(int connection_sock, char* buffer, size_t buffer_
 
 // функция вычитывет строки из соединения
 // проверяет делимость на 32
-// return: 
+// return:
 // 0 - ошибок нет, достигнут
 // -1
-// 
-int read_data(int connection_sock) {   
+//
+int read_data(int connection_sock) {
     const unsigned length_min = 3;
     const unsigned n_digits = 5;
     const size_t buffer_size = n_digits + 1;
-    char buffer[buffer_size] = {0};  
+    char buffer[buffer_size] = {0};
     ssize_t line_length{};
     unsigned value{};
     while((line_length = read_digits_line_remainder(connection_sock, buffer, buffer_size)) != 0) {
@@ -96,7 +96,7 @@ int read_data(int connection_sock) {
         if(line_length < length_min) {
             printf("    error: expected length > %u, but received %u\n", length_min - 1, static_cast<unsigned>(line_length));
         }
-        else if(!is_multiple_of_32(value)) {         
+        else if(!is_multiple_of_32(value)) {
             printf("    error: value %u is not multiple of 32\n", value);
         }
         else {
@@ -107,20 +107,16 @@ int read_data(int connection_sock) {
 }
 
 int main() {
-    
     int server_sock = socket(AF_INET, SOCK_STREAM, 0);
     if(server_sock == -1) {
         perror("socket failed");
         return -1;
     }
 
-    SocketAddress server_address = {
-        .sa_in = {
-            .sin_family = AF_INET,
-            .sin_port =  htons(PORT),
-            .sin_addr = INADDR_ANY
-        }
-    };
+    SocketAddress server_address {};
+    server_address.sa_in.sin_family = AF_INET;
+    server_address.sa_in.sin_port =  htons(PORT);
+    server_address.sa_in.sin_addr.s_addr = INADDR_ANY;
 
     if(bind(server_sock, &server_address.sa, sizeof(server_address.sa_in)) == -1) {
         perror("bind failed");
@@ -133,9 +129,9 @@ int main() {
         close(server_sock);
         return -1;
     }
-    
+
     for(;;) {
-        SocketAddress  remote_address = {};
+        SocketAddress remote_address {};
         socklen_t addrlen = sizeof(server_address);
         printf("Wait for connections\n");
         int connection_sock = accept(server_sock, &remote_address.sa, &addrlen);
@@ -158,8 +154,8 @@ int main() {
             perror("close connection socket\n");
             close(server_sock);
             return -1;
-        }        
-        printf("Connection closed\n");  
+        }
+        printf("Connection closed\n");
     }
     return 0;
 }

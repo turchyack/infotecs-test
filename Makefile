@@ -5,6 +5,6 @@ all:
 	$(MAKE) -C client all
 
 archive: project-sources.zip
-project-sources.zip: $(ARCHIVE_COMPONENTS) 
+project-sources.zip: $(ARCHIVE_COMPONENTS)
 	rm -f '$@'
 	zip '$@' $(ARCHIVE_COMPONENTS)
