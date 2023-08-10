@@ -1,4 +1,5 @@
 #include "chat/types.hpp"
+#include "chat/constants.hpp"
 #include <cctype>
 #include <cstdlib>
 #include <sys/socket.h>
@@ -8,7 +9,6 @@
 #include <charconv>
 #include <cstring>
 
-static uint16_t PORT = 10001;
 
 // функция
 // проверяет делимость на 32 передаваемого ей числа
@@ -115,7 +115,7 @@ int main() {
 
     SocketAddress server_address {};
     server_address.sa_in.sin_family = AF_INET;
-    server_address.sa_in.sin_port =  htons(PORT);
+    server_address.sa_in.sin_port =  htons(SERVER_PORT);
     server_address.sa_in.sin_addr.s_addr = INADDR_ANY;
 
     if(bind(server_sock, &server_address.sa, sizeof(server_address.sa_in)) == -1) {

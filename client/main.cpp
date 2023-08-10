@@ -1,3 +1,5 @@
+#include "chat/types.hpp"
+#include "chat/constants.hpp"
 #include <errno.h>
 #include <cstdio>
 #include <cstring>
@@ -7,9 +9,8 @@
 #include <unistd.h>
 #include <mutex>
 #include <condition_variable>
-
-const size_t DATA_SIZE_MAX = 64;
-
+#include <netinet/in.h>
+#include <sys/socket.h>
 
 // return
 // -1 - ошибка ввода/вывода
@@ -106,6 +107,42 @@ unsigned calc_sum(char* data, size_t data_length) {
     return sum;
 }
 
+int send_data_to_server(const char* send_buffer, size_t send_buffer_size) {
+ int client_sock = socket(AF_INET, SOCK_STREAM, 0);
+    if(client_sock == -1) {
+        perror("socket failed");
+        return -1;
+    }
+
+    int opt = 1;
+    SocketAddress client_address {};
+    client_address.sa_in.sin_family = AF_INET;
+    client_address.sa_in.sin_port =  htons(SERVER_PORT);
+    client_address.sa_in.sin_addr.s_addr = htonl(SERVER_ADDRESS);
+
+    if (setsockopt(client_sock, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
+	{
+		perror("setsockopt");
+		exit(EXIT_FAILURE);
+	}
+
+    if(connect(client_sock, &client_address.sa, sizeof(client_address.sa_in)) == -1) {
+        perror("connect failed");
+        close(client_sock);
+        return -1;
+    }
+
+    if(send(client_sock, send_buffer, send_buffer_size, 0) == -1) {
+        perror("sending failed");
+        close(client_sock);
+        return -1;
+    }
+
+    close(client_sock);
+
+    return 0;
+}
+
 class Sender {
 public:
     Sender();
@@ -142,7 +179,6 @@ void Sender::main() {
     std::unique_lock lk(m);
 
     while(sender_work) {
-       // fprintf(stderr, "debug wait for cv\n");
         cv.wait(lk);
         if(shared_data_length !=0) {
             memcpy(send_data, shared_buffer, shared_data_length);
@@ -156,19 +192,25 @@ void Sender::main() {
 
         lk.unlock();
         fprintf(stderr, "do long processing\n");
-        {
-            fprintf(stderr, "sender input data: '%.*s'\n", static_cast<unsigned>(length), send_data);
-            unsigned sum = calc_sum(send_data, length);   // тут ставим соединение
-            fprintf(stderr, "data sum = %u\n", sum);
+        fprintf(stderr, "sender input data: '%.*s'\n", static_cast<unsigned>(length), send_data);
+        unsigned sum = calc_sum(send_data, length);
+        fprintf(stderr, "data sum = %u\n", sum);
+        const size_t max_digits = 10;
+        const size_t message_buff_size = max_digits+1;
+        char message_buff[message_buff_size] = {};
+        int message_length = snprintf(message_buff, message_buff_size, "%u\n", sum);
 
-
-            sleep(1);
-
+        if(static_cast<size_t>(message_length) > max_digits) {
+            fprintf(stderr, "buffer too small");
         }
+        else {
+            send_data_to_server(message_buff, message_length);
+        }
+
+
 
         lk.lock();
     }
-
 
     fprintf(stderr,"debug end of thread\n");
 }
@@ -181,25 +223,20 @@ void Sender::stop() {
 }
 
 void Sender::send(char* data, size_t data_length) {
-
     if(buffer_size < data_length) {
         fprintf(stderr,"buffer too small\n");
     }
-    std::unique_lock lk(m);
 
+    std::unique_lock lk(m);
     memcpy(shared_buffer, data, data_length);
     this->shared_data_length = data_length;
     lk.unlock();
     cv.notify_one();
-
 }
-
 
 int main() {
 
     Sender sender;
-
-    // обработка данных потоком №1
     const size_t buffer_size = DATA_SIZE_MAX;
     char buffer[buffer_size] = {};
     const size_t result_buffer_size = buffer_size * 2;
@@ -223,9 +260,7 @@ int main() {
                 fprintf(stderr, "error: wrong number\n");
                 continue;
             }
-
         }
-
         ssize_t transformed_length = transform_data(buffer,  line_length, result_buffer, result_buffer_size);
         if(transformed_length == -1) {
             return -1;
